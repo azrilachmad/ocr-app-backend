@@ -1,0 +1,28 @@
+# APP Configuration
+# (development / production)
+NODE_ENV=production
+
+PORT=
+
+# Gemini API Configuration
+GEMINI_API_KEY=
+
+
+# Database Configuration
+# DB_HOST=
+# DB_USERNAME=
+# DB_PASSWORD=
+# DB_PORT=
+# DB_NAME=
+
+# Local
+DB_HOST=
+DB_USERNAME=
+DB_PASSWORD=
+DB_PORT=
+DB_NAME=
+
+
+# JWT Configuration
+JWT_SECRET_KEY=
+JWT_EXPIRE_IN=
