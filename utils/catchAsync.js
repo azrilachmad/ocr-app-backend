@@ -1,9 +1,8 @@
+// OCR-APP-BACKEND/utils/catchAsync.js
 const catchAsync = (fn) => {
-    const errorHandler = (req, res, next) => {
-        fn(req, res, next).catch(next)
-    }
+  return (req, res, next) => {
+    fn(req, res, next).catch(next); // Otomatis menangkap error dari promise dan meneruskannya ke 'next'
+  };
+};
 
-    return errorHandler;
-}
-
-module.exports = catchAsync
+module.exports = catchAsync;
