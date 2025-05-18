@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const { ocrInvoiceTesseractController } = require('../controllers/invoiceController'); // Pastikan path ini benar
+const { ocrInvoiceController } = require('../controllers/invoiceController');
 
 const router = express.Router();
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
@@ -51,6 +51,6 @@ const upload = multer({
     fileFilter: fileFilter
 });
 
-router.post('/process', upload.single('invoiceImageFile'), ocrInvoiceTesseractController);
+router.post('/process', upload.single('invoiceImageFile'), ocrInvoiceController);
 
 module.exports = router;

@@ -2,66 +2,54 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const { runOcrWithTesseract } = require('../utils/tesseractService');
+
+// Impor layanan baru
+const { extractTextWithVisionAI } = require('../utils/googleVisionService');
 const { extractDetailsWithGemini } = require('../utils/geminiAiStudioService');
-const { convertPdfToPng } = require('../utils/pdfConverterService');
-const AppError = require('../utils/appError'); // Impor AppError
-const catchAsync = require('../utils/catchAsync'); // Impor catchAsync
+const AppError = require('../utils/appError');
+const catchAsync = require('../utils/catchAsync');
 
-const tesseractLang = process.env.TESSERACT_LANG || 'eng';
-
-const ocrInvoiceTesseractController = catchAsync(async (req, res, next) => {
+// Ganti nama controller agar lebih sesuai (opsional, tapi disarankan)
+const ocrInvoiceController = catchAsync(async (req, res, next) => {
     if (!req.file) {
         return next(new AppError("Tidak ada file yang diunggah atau file ditolak oleh filter.", 400));
     }
 
     const originalFilePath = req.file.path;
     const originalFileName = req.file.originalname;
-    console.log(`Menerima file: ${originalFileName}, tipe: ${req.file.mimetype}, disimpan sementara sebagai: ${originalFilePath}`);
+    const mimeType = req.file.mimetype;
 
-    let filePathForOcr = originalFilePath;
-    let tempImageFromPdfPath = null;
+    console.log(`Menerima file: ${originalFileName}, tipe: ${mimeType}, disimpan sementara sebagai: ${originalFilePath}`);
 
-    // Menggunakan blok try...finally untuk memastikan pembersihan file selalu terjadi,
-    // bahkan jika error dilempar dari dalam dan ditangkap oleh catchAsync.
+    // Blok try...finally tetap untuk pembersihan file
     try {
-        if (req.file.mimetype === 'application/pdf') {
-            console.log(`File ${originalFileName} adalah PDF, memulai konversi ke gambar (halaman pertama)...`);
-            const outputDirectory = path.dirname(originalFilePath);
-            const outputImagePrefix = `pdfconv_${path.parse(originalFileName).name.replace(/[^a-zA-Z0-9_]/g, '_')}_${Date.now()}`;
-
-            // Fungsi convertPdfToPng sendiri sudah memiliki try...catch dan akan melempar error jika gagal
-            // catchAsync akan menangkap error tersebut.
-            tempImageFromPdfPath = await convertPdfToPng(originalFilePath, outputDirectory, outputImagePrefix);
-            filePathForOcr = tempImageFromPdfPath;
-            console.log(`PDF ${originalFileName} berhasil dikonversi ke gambar: ${filePathForOcr}`);
-        }
-
-        console.log(`Memulai pemrosesan OCR untuk file (gambar): ${path.basename(filePathForOcr)} dengan bahasa: ${tesseractLang}`);
-        // runOcrWithTesseract juga sudah memiliki try...catch dan akan melempar error
-        const ocrText = await runOcrWithTesseract(filePathForOcr, tesseractLang);
+        // Konversi PDF ke gambar tidak lagi diperlukan di sini karena Vision API bisa menangani PDF (dengan batasan)
+        console.log(`INFO: Memulai pemrosesan dengan Google Vision AI untuk file: ${originalFileName}`);
+        const ocrText = await extractTextWithVisionAI(originalFilePath, mimeType);
 
         if (!ocrText || ocrText.trim() === "") {
-            console.warn(`Tesseract tidak dapat mengekstrak teks dari: ${path.basename(filePathForOcr)} (file asli: ${originalFileName})`);
-            // Lempar AppError agar ditangani oleh global error handler
-            throw new AppError("Tesseract tidak dapat mengekstrak teks, atau file tidak mengandung teks yang dapat dibaca.", 400);
+            console.warn(`Google Vision AI tidak dapat mengekstrak teks dari: ${originalFileName}`);
+            // Jangan teruskan ke Gemini jika tidak ada teks
+            throw new AppError("Google Vision AI tidak dapat mengekstrak teks, atau file tidak mengandung teks yang dapat dibaca.", 400);
         }
-        console.log(`Teks dari Tesseract (file olahan: ${path.basename(filePathForOcr)}, asli: ${originalFileName}) diterima, panjang: ${ocrText.length}`);
+        console.log(`INFO: Teks dari Google Vision AI (file: ${originalFileName}) diterima, panjang: ${ocrText.length}`);
+        // Untuk debug, uncomment:
+        // console.debug("Preview Teks OCR dari Vision AI:", ocrText.substring(0, 500) + "...");
 
-        console.log(`Mengirim teks OCR (dari ${originalFileName}) ke Gemini API...`);
-        // extractDetailsWithGemini juga sudah memiliki try...catch dan akan melempar error
-        const extractedData = await extractDetailsWithGemini(ocrText);
-        console.log(`Data dari Gemini API (dari ${originalFileName}) berhasil diterima.`);
+        console.log(`INFO: Mengirim teks OCR (dari ${originalFileName}) ke Gemini API...`);
+        const extractedData = await extractDetailsWithGemini(ocrText); // Gemini akan melakukan semua ekstraksi field
+        console.log(`INFO: Data dari Gemini API (dari ${originalFileName}) berhasil diterima.`);
 
         res.status(200).json({
-            message: "Invoice berhasil diproses",
+            message: "Invoice berhasil diproses dengan Google Vision AI dan Gemini API", // Pesan diupdate
             fileName: originalFileName,
-            processedFileType: req.file.mimetype,
+            processedFileType: mimeType,
             extracted_data: extractedData,
             ocr_source_text_preview: ocrText.substring(0, 250) + (ocrText.length > 250 ? "..." : "")
         });
 
     } finally {
+        // Pembersihan file asli yang diunggah
         if (originalFilePath) {
             try {
                 await fs.unlink(originalFilePath);
@@ -72,17 +60,9 @@ const ocrInvoiceTesseractController = catchAsync(async (req, res, next) => {
                 }
             }
         }
-        if (tempImageFromPdfPath && tempImageFromPdfPath !== originalFilePath) { // Pastikan tidak menghapus file yang sama dua kali
-            try {
-                await fs.unlink(tempImageFromPdfPath);
-                console.log(`Gambar sementara hasil konversi PDF ${tempImageFromPdfPath} (dari ${originalFileName}) berhasil dihapus.`);
-            } catch (unlinkError) {
-                if (unlinkError.code !== 'ENOENT') {
-                    console.error(`Gagal menghapus gambar sementara ${tempImageFromPdfPath} (dari ${originalFileName}):`, unlinkError);
-                }
-            }
-        }
+        // Tidak ada tempImageFromPdfPath yang perlu dihapus jika Vision API menangani PDF
     }
 });
 
-module.exports = { ocrInvoiceTesseractController };
+// Pastikan nama export konsisten jika Anda mengganti nama fungsi controller
+module.exports = { ocrInvoiceController };

@@ -7,6 +7,9 @@ const invoiceRoutes = require('./routes/upload');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const cors = require('cors');
+
+app.use(cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -83,10 +86,4 @@ app.listen(port, () => {
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "YOUR_GEMINI_API_KEY") {
         console.warn("PERINGATAN: GEMINI_API_KEY belum diatur dengan benar di file .env!");
     }
-    if (!process.env.TESSERACT_LANG) {
-        console.warn("PERINGATAN: TESSERACT_LANG tidak diatur di .env.");
-    } else {
-        console.log(`Bahasa Tesseract yang akan digunakan (dari .env): ${process.env.TESSERACT_LANG}`);
-    }
-    console.log(`Untuk dukungan PDF, pastikan Poppler utilities terinstal (POPPLER_PATH: ${process.env.POPPLER_PATH || 'dari System PATH'}).`);
 });
