@@ -36,69 +36,89 @@ const model = genAI.getGenerativeModel({
 // Fungsi untuk membuat prompt
 // PASTIKAN ANDA MENYALIN SELURUH SKEMA JSON ANDA DI SINI
 const promptTemplate = (ocrText) => `
-    Anda adalah sistem AI yang sangat canggih dan presisi untuk ekstraksi data dari teks invoice hasil OCR.
-    Tugas Anda adalah membaca teks berikut, mengidentifikasi informasi kunci, dan mengembalikannya dalam format JSON yang ketat.
+    Anda adalah sistem AI yang sangat canggih untuk ekstraksi data dari teks invoice hasil OCR dari industri farmasi dan alat kesehatan di Indonesia.
+    Tugas Anda adalah membaca teks berikut, mengidentifikasi semua informasi kunci, dan mengembalikannya dalam format JSON yang ketat.
 
     Teks Invoice (hasil OCR):
     \`\`\`text
     ${ocrText}
     \`\`\`
 
-    Format JSON yang WAJIB diikuti (gunakan nilai null jika data tidak ditemukan, angka harus tipe number, tanggal harus YYYY-MM-DD):
+    Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan):
     {
-      "nomor_invoice": "string | null",
-      "tanggal_invoice": "string (YYYY-MM-DD) | null",
-      "tanggal_jatuh_tempo": "string (YYYY-MM-DD) | null",
-      "nama_vendor": "string | null",
-      "alamat_vendor": "string | null",
-      "telepon_vendor": "string | null",
-      "email_vendor": "string | null",
-      "website_vendor": "string | null",
-      "npwp_vendor": "string | null",
-      "nama_pelanggan": "string | null",
-      "alamat_pelanggan": "string | null",
-      "telepon_pelanggan": "string | null",
-      "email_pelanggan": "string | null",
+      "informasi_umum": {
+        "tipe_dokumen": "string", // "INVOICE PEMBELIAN" atau "FAKTUR PENJUALAN"
+        "judul_dokumen": "string | null", // "INVOICE", "FAKTUR", "DELIVERY ORDER"
+        "nomor_dokumen": "string | null",
+        "nomor_faktur_pajak": "string | null",
+        "nomor_purchase_order": "string | null",
+        "nomor_sales_order": "string | null",
+        "tanggal_terbit": "string (YYYY-MM-DD) | null",
+        "tanggal_jatuh_tempo": "string (YYYY-MM-DD) | null",
+        "nama_salesman": "string | null"
+      },
+      "pihak_terlibat": {
+        "vendor": {
+          "nama": "string | null",
+          "alamat": "string | null",
+          "telepon": "string | null",
+          "npwp": "string | null"
+        },
+        "pelanggan": {
+          "nama": "string | null",
+          "alamat_penagihan": "string | null",
+          "alamat_pengiriman": "string | null",
+          "telepon": "string | null",
+          "npwp": "string | null"
+        }
+      },
       "item_baris": [
         {
-          "kode_item": "string | null",
           "deskripsi": "string",
           "kuantitas": "number",
-          "satuan": "string | null", // e.g., pcs, kg, unit
+          "satuan": "string | null", // e.g., pcs, box
           "harga_satuan": "number",
-          "diskon_item_persen": "number | null", // Diskon per item jika ada
-          "diskon_item_jumlah": "number | null",
-          "pajak_item_persen": "number | null", // Pajak per item jika ada
-          "pajak_item_jumlah": "number | null",
-          "total_harga_item": "number" // (kuantitas * harga_satuan) - diskon_item_jumlah + pajak_item_jumlah
+          "diskon_persen": "number | null",
+          "diskon_jumlah": "number | null",
+          "total_harga": "number",
+          "nomor_batch": "string | null",
+          "tanggal_kedaluwarsa": "string (YYYY-MM-DD) | null"
         }
       ],
-      "subtotal_sebelum_diskon_pajak_global": "number | null", // Total semua total_harga_item sebelum diskon dan pajak global invoice
-      "diskon_global_persen": "number | null", // Diskon untuk keseluruhan invoice
-      "diskon_global_jumlah": "number | null",
-      "subtotal_setelah_diskon_global": "number | null",
-      "pajak_ppn_persen": "number | null",
-      "pajak_ppn_jumlah": "number | null",
-      "pajak_pph_persen": "number | null", // Untuk PPh jika teridentifikasi
-      "pajak_pph_jumlah": "number | null",
-      "biaya_pengiriman": "number | null",
-      "biaya_lain": "number | null",
-      "total_keseluruhan": "number | null", // Nilai akhir yang harus dibayar
-      "mata_uang": "string (IDR, USD, dll.) | null", // Harus konsisten
-      "metode_pembayaran": "string | null",
-      "rekening_bank_vendor": "string | null",
-      "catatan": "string | null"
+      "rekapitulasi_finansial": {
+        "subtotal": "number | null",
+        "total_diskon_global_jumlah": "number | null", // Dari "Potongan" atau "Total Discount"
+        "dasar_pengenaan_pajak_dpp": "number | null",
+        "pajak_ppn_jumlah": "number | null",
+        "ongkos_kirim": "number | null",
+        "biaya_meterai": "number | null",
+        "total_tagihan_akhir": "number",
+        "mata_uang": "string (IDR, USD, dll.) | null",
+        "terbilang": "string | null"
+      },
+      "detail_pembayaran": {
+        "metode": "string | null",
+        "nama_bank": "string | null",
+        "nomor_rekening": "string | null",
+        "nama_pemilik_rekening": "string | null"
+      },
+      "informasi_legal_otorisasi": {
+        "nama_penandatangan": "string | null",
+        "jabatan_penandatangan": "string | null",
+        "nomor_sipa": "string | null", // Surat Izin Praktik Apoteker
+        "nomor_sik": "string | null", // Surat Izin Kerja
+        "catatan": "string | null"
+      }
     }
 
     INSTRUKSI PENTING:
-    1. Akurasi dan kepatuhan pada skema JSON adalah prioritas utama. Jika tidak yakin tentang suatu field, gunakan null.
-    2. Ekstrak SEMUA item baris yang ada. Jika tidak ada item baris, kembalikan array kosong [].
-    3. Pastikan semua nilai numerik adalah tipe 'number', bukan string. Bersihkan simbol mata uang, koma sebagai pemisah ribuan, dan gunakan titik sebagai pemisah desimal sebelum konversi ke number.
-    4. Format tanggal HARUS YYYY-MM-DD. Konversi dari format lain. Jika tahun tidak ada, asumsikan tahun berjalan (${new Date().getFullYear()}) jika konteks mendukung, atau null.
-    5. Jika ada beberapa jenis pajak (PPN, PPh), coba pisahkan. Jika hanya ada satu nilai pajak tanpa keterangan, asumsikan PPN.
-    6. Output HANYA berupa JSON yang valid dan lengkap sesuai skema di atas. JANGAN tambahkan teks penjelasan, komentar, atau markdown seperti \`\`\`json.
+    1. Kepatuhan pada skema JSON adalah prioritas utama.
+    2. Identifikasi apakah ini "INVOICE PEMBELIAN" (jika perusahaan Anda adalah pelanggan) atau "FAKTUR PENJUALAN" (jika perusahaan Anda adalah vendor), isi di 'tipe_dokumen'.
+    3. Ekstrak SEMUA item baris. Jika tidak ada, kembalikan array kosong [].
+    4. Konversi semua nilai numerik ke tipe 'number'. Bersihkan 'Rp', koma ribuan, dan gunakan titik desimal.
+    5. Format tanggal HARUS YYYY-MM-DD.
+    6. Output HANYA berupa JSON yang valid. JANGAN tambahkan teks penjelasan atau markdown.
     `;
-
 
 async function extractDetailsWithGemini(ocrText) {
     // Pengecekan API Key lagi sebelum setiap panggilan (meskipun sudah dicek di atas, ini untuk keamanan fungsi)
