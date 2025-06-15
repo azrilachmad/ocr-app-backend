@@ -3,8 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
-const { sequelize } = require('./models'); // Impor sequelize dari models/index.js
-const invoiceRoutes = require('./routes/route');
+const ocrRoute = require('./routes/ocrRoute'); // Impor rute invoice
 const globalErrorHandler = require('./utils/errorHandler'); // Impor global error handler
 
 const app = express();
@@ -16,7 +15,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rute
-app.use('/api/invoice', invoiceRoutes);
+app.use('/api/invoice', ocrRoute);
 
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -35,15 +34,10 @@ app.use(globalErrorHandler);
 // Fungsi untuk memulai server setelah database siap
 const startServer = async () => {
   try {
-    // 1. Coba hubungkan ke database
-    await sequelize.authenticate();
-    console.log('✅ Koneksi database berhasil.');
+    // Coba hubungkan ke database
+    // await sequelize.authenticate();
+    // console.log('✅ Koneksi database berhasil.');
 
-    // 2. Sinkronkan semua model. Ini akan MEMBUAT TABEL jika belum ada.
-    await sequelize.sync(); 
-    console.log('✅ Semua model berhasil disinkronkan. Tabel sudah siap.');
-
-    // 3. Jalankan server HANYA JIKA database sudah siap
     app.listen(port, () => {
       console.log(`🚀 Server OCR App Backend berjalan di http://localhost:${port}`);
       if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.includes("YOUR_GEMINI_API_KEY")) {
