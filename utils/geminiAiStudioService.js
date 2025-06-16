@@ -205,7 +205,7 @@ Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan):
     "no_sertifikat_uji_tipe": "string | null",
     "jenis_kendaraan_kategori": "string | null",
   },
-  "dokumen_registrtasi_pertama": {
+  "dokumen_registrasi_pertama": {
     "nomor_faktur": "string | null",
     "tanggal": "string (YYYY-MM-DD) | null",
     "atpm_importir": "string | null",
