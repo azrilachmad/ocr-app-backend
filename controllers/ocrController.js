@@ -7,7 +7,8 @@ const catchAsync = require('../utils/catchAsync');
 const { extractTextWithVisionAI } = require('../utils/googleVisionService');
 const { extractDetailsWithGemini, identifyDocumentType } = require('../utils/geminiAiStudioService');
 
-// Impor komponen database dan helper
+
+const { Invoice, InvoiceItem, Stnk, Bpkb, sequelize } = require('../models'); // Pastikan path ini benar
 const { convDate } = require('../helper');
 
 
@@ -61,7 +62,8 @@ exports.processOcrOnly = catchAsync(async (req, res, next) => {
             message: 'Dokumen berhasil diproses.',
             data: {
                 document_type: documentType,
-                content: extractedData
+                content: extractedData,
+                raw_ocr_text: combinedOcrText
             }
         });
 
@@ -77,3 +79,151 @@ exports.processOcrOnly = catchAsync(async (req, res, next) => {
     }
 });
 
+/**
+ * Controller terpadu untuk MENYIMPAN semua jenis dokumen ke tabel yang sesuai.
+ */
+exports.submitData = catchAsync(async (req, res, next) => {
+    const { document_type, content, raw_ocr_text } = req.body;
+    if (!document_type || !content) {
+        return next(new AppError('Format data tidak valid.', 400));
+    }
+
+    let result;
+
+    switch (document_type) {
+        case 'INVOICE':
+            result = await sequelize.transaction(async (t) => {
+                const newInvoice = await Invoice.create({
+                    invoiceType: content.informasi_umum?.tipe_dokumen?.toLowerCase().includes('pembelian') ? 'pembelian' : 'penjualan',
+                    documentTitle: content.informasi_umum?.judul_dokumen,
+                    documentNumber: content.informasi_umum?.nomor_dokumen,
+                    taxInvoiceNumber: content.informasi_umum?.nomor_faktur_pajak,
+                    purchaseOrderNumber: content.informasi_umum?.nomor_purchase_order,
+                    salesOrderNumber: content.informasi_umum?.nomor_sales_order,
+                    issueDate: convDate(content.informasi_umum?.tanggal_terbit),
+                    dueDate: convDate(content.informasi_umum?.tanggal_jatuh_tempo),
+                    salespersonName: content.informasi_umum?.nama_salesman,
+                    vendorName: content.pihak_terlibat?.vendor?.nama,
+                    vendorAddress: content.pihak_terlibat?.vendor?.alamat,
+                    vendorPhone: content.pihak_terlibat?.vendor?.telepon,
+                    vendorNpwp: content.pihak_terlibat?.vendor?.npwp,
+                    customerName: content.pihak_terlibat?.pelanggan?.nama,
+                    customerBillingAddress: content.pihak_terlibat?.pelanggan?.alamat_penagihan,
+                    customerShippingAddress: content.pihak_terlibat?.pelanggan?.alamat_pengiriman,
+                    customerPhone: content.pihak_terlibat?.pelanggan?.telepon,
+                    customerNpwp: content.pihak_terlibat?.pelanggan?.npwp,
+                    subtotal: content.rekapitulasi_finansial?.subtotal,
+                    globalDiscountAmount: content.rekapitulasi_finansial?.total_diskon_global_jumlah,
+                    taxableAmountDpp: content.rekapitulasi_finansial?.dasar_pengenaan_pajak_dpp,
+                    vatAmount: content.rekapitulasi_finansial?.pajak_ppn_jumlah,
+                    shippingCost: content.rekapitulasi_finansial?.ongkos_kirim,
+                    stampDutyFee: content.rekapitulasi_finansial?.biaya_meterai,
+                    grandTotal: content.rekapitulasi_finansial?.total_tagihan_akhir,
+                    currency: content.rekapitulasi_finansial?.mata_uang,
+                    amountInWords: content.rekapitulasi_finansial?.terbilang,
+                    paymentMethod: content.detail_pembayaran?.metode,
+                    paymentBankName: content.detail_pembayaran?.nama_bank,
+                    paymentAccountNumber: content.detail_pembayaran?.nomor_rekening,
+                    paymentAccountName: content.detail_pembayaran?.nama_pemilik_rekening,
+                    signerName: content.informasi_legal_otorisasi?.nama_penandatangan,
+                    signerPosition: content.informasi_legal_otorisasi?.jabatan_penandatangan,
+                    sipaNumber: content.informasi_legal_otorisasi?.nomor_sipa,
+                    sikNumber: content.informasi_legal_otorisasi?.nomor_sik,
+                    notes: content.informasi_legal_otorisasi?.catatan,
+                    rawOcrText: raw_ocr_text
+                }, { transaction: t });
+                const lineItems = content.item_baris;
+                if (lineItems && lineItems.length > 0) {
+                    const itemsToCreate = lineItems.map(item => ({
+                        invoiceId: newInvoice.id,
+                        description: item.deskripsi,
+                        quantity: item.kuantitas,
+                        unit: item.satuan,
+                        unitPrice: item.harga_satuan,
+                        discountPercentage: item.diskon_persen,
+                        discountAmount: item.diskon_jumlah,
+                        totalPrice: item.total_harga,
+                        batchNumber: item.nomor_batch,
+                        expiryDate: convDate(item.tanggal_kedaluwarsa)
+                    }));
+                    await InvoiceItem.bulkCreate(itemsToCreate, { transaction: t });
+                }
+                return newInvoice;
+            });
+            break;
+        case 'STNK':
+            result = await Stnk.create({
+                no: content.data_kendaraan?.no,
+                nomorRegistrasi: content.data_kendaraan?.nomor_registrasi,
+                namaPemilik: content.data_kendaraan?.nama_pemilik,
+                alamat: content.data_kendaraan?.alamat,
+                merk: content.data_kendaraan?.merk,
+                tipe: content.data_kendaraan?.tipe,
+                jenis: content.data_kendaraan?.jenis,
+                model: content.data_kendaraan?.model,
+                tahunPembuatan: content.data_kendaraan?.tahun_pembuatan,
+                isiSilinder: content.data_kendaraan?.isi_silinder,
+                nomorRangka: content.data_kendaraan?.nomor_rangka,
+                nomorMesin: content.data_kendaraan?.nomor_mesin,
+                nik: content.data_kendaraan?.nik,
+                warna: content.data_kendaraan?.warna,
+                bahanBakar: content.data_kendaraan?.bahan_bakar,
+                warnaTnkb: content.data_kendaraan?.warna_tnkb,
+                tahunRegistrasi: content.data_kendaraan?.tahun_registrasi,
+                nomorBpkb: content.data_kendaraan?.nomor_bpkb,
+                noUrutPendaftaran: content.data_kendaraan?.no_urut_pendaftaran,
+                kodeLokasi: content.data_kendaraan?.kode_lokasi,
+                berlakuSampai: convDate(content.data_kendaraan?.berlaku_sampai),
+                rawOcrText: raw_ocr_text
+            });
+            break;
+        case 'BPKB':
+            result = await Bpkb.create({
+                no: content.no,
+                namaPemilik: content.identitas_pemilik?.nama_pemilik,
+                pekerjaan: content.identitas_pemilik?.pekerjaan,
+                alamat: content.identitas_pemilik?.alamat,
+                noKtp: content.identitas_pemilik?.nomor_ktp,
+                lokasiDikeluarkan: content.identitas_pemilik?.lokasi_dikeluarkan,
+                tanggalDikeluarkan: convDate(content.identitas_pemilik?.tanggal_dikeluarkan),
+                nomorRegistrasi: content.identitas_kendaraan?.nomor_registrasi,
+                merk: content.identitas_kendaraan?.merk,
+                tipe: content.identitas_kendaraan?.tipe,
+                jenis: content.identitas_kendaraan?.jenis,
+                model: content.identitas_kendaraan?.model,
+                tahunPembuatan: content.identitas_kendaraan?.tahun_pembuatan,
+                isiSilinder: content.identitas_kendaraan?.isi_silinder,
+                warna: content.identitas_kendaraan?.warna,
+                nomorRangka: content.identitas_kendaraan?.nomor_rangka,
+                nomorMesin: content.identitas_kendaraan?.nomor_mesin,
+                bahanBakar: content.identitas_kendaraan?.bahan_bakar,
+                jumlahSumbu: content.identitas_kendaraan?.jumlah_sumbu,
+                jumlahRoda: content.identitas_kendaraan?.jumlah_roda,
+                noSertifikatUjiTipe: content.identitas_kendaraan?.no_sertifikat_uji_tipe,
+                jenisKendaraanKategori: content.identitas_kendaraan?.jenis_kendaraan_kategori,
+                nomorFaktur: content.dokumen_registrasi_pertama?.nomor_faktur,
+                tanggalFaktur: convDate(content.dokumen_registrasi_pertama?.tanggal),
+                atpmImportir: content.dokumen_registrasi_pertama?.atpm_importir,
+                nomorPib: content.dokumen_registrasi_pertama?.nomor_pib,
+                nomorsut: content.dokumen_registrasi_pertama?.nomor_sut,
+                noFormAbc: content.dokumen_registrasi_pertama?.no_form_abc,
+                kantorBeaCukai: content.dokumen_registrasi_pertama?.kantor_bea_cukai,
+                noRisalahLelang: content.dokumen_registrasi_pertama?.no_risalah_lelang,
+                noSkepDum: content.dokumen_registrasi_pertama?.no_skep_dum,
+                perubahan: content.perubahan?.perubahan,
+                jenisPerubahan: content.perubahan?.jenis_perubahan,
+                lokasiPerubahanDikeluarkan: content.perubahan?.lokasi_perubahan_dikeluarkan,
+                tanggalPerubahanDikeluarkan: convDate(content.perubahan?.tanggal_perubahan_dikeluarkan),
+                catatanKhusus: content.catatan_khusus,
+                rawOcrText: raw_ocr_text
+            });
+            break;
+        default:
+            return next(new AppError(`Tipe dokumen '${document_type}' tidak didukung untuk disimpan.`, 400));
+    }
+    res.status(201).json({
+        status: 'success',
+        message: `Data ${document_type} berhasil disimpan.`,
+        data: result
+    });
+});
