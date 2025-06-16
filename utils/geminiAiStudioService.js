@@ -150,8 +150,8 @@ Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan):
     "bahan_bakar": "string | null",
     "warna_tnkb": "string | null",
     "tahun_registrasi": "string | null",
-    "nomor_bpkb": "string | null",
-    "no_urut_pendaftaran": "string | null",
+    "nomor_bpkb": "string | null", // 9 digit kode lokasi + nomor urut pendaftaran (misal: I-xxxxxxxx atau xxxxxxxxx)
+    "no_urut_pendaftaran": "string | null", // format: xxx/xxxx-xxx/XXX/xxxxxxxx
     "kode_lokasi": "string | null",
     "berlaku_sampai": "date (YYYY-MM-DD) | null",
   },
@@ -161,9 +161,10 @@ Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan):
 INSTRUKSI PENTING:
 1. Patuhi struktur JSON secara ketat.
 2. Konversi semua tanggal ke format YYYY-MM-DD bila memungkinkan.
-3. Bersihkan teks dari karakter yang tidak relevan seperti titik dua ganda, spasi berlebih, atau pemisah yang tidak standar.
+3. Bersihkan teks dari karakter yang tidak relevan seperti titik dua ganda atau spasi berlebih
 4. Jika nilai tidak ditemukan, isi dengan **null**.
 5. Output HANYA berupa JSON valid tanpa teks tambahan, komentar, atau markdown.
+6. Bedakan antara nomor 1 dan huruf 'I' atau 'l' (gunakan konteks untuk menentukan).
 `;
 
 const promptBPKB = (ocrText) => `
@@ -190,7 +191,7 @@ Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan):
   "identitas_kendaraan": {
     "nomor_registrasi": "string | null" (pastikan kode  lokasi sesuai dengan data kota lokasi pemilik),
     "merk": "string | null",
-    "type": "string | null",
+    "tipe": "string | null",
     "jenis": "string | null",
     "model": "string | null",
     "tahun_pembuatan": "string | null",
@@ -220,8 +221,8 @@ Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan):
   "perubahan_identitas": {
     "perubahan": "string | null",
     "jenis_perubahan": "string | null",
-    "lokasi_dikeluarkan": "string | null",
-    "tanggal_dikeluarkan": "string (YYYY-MM-DD) | null"
+    "lokasi_perubahan_dikeluarkan": "string | null",
+    "tanggal_perubahan_dikeluarkan": "string (YYYY-MM-DD) | null"
   },
   "catatan_khusus": "string | null"
 }

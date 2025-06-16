@@ -1,15 +1,12 @@
-// Di dalam file: routes/route.js
-
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const AppError = require('../utils/appError');
-
-const ocrController = require('../controllers/ocrController');
+const ocrController = require('../controllers/ocrController'); 
 const router = express.Router();
 
-// --- Konfigurasi Multer (tidak ada perubahan) ---
+// --- Konfigurasi Multer
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
     try {
@@ -24,7 +21,7 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const extension = path.extname(file.originalname);
-        cb(null, 'invoice-' + uniqueSuffix + extension);
+        cb(null, 'doc-' + uniqueSuffix + extension);
     }
 });
 const fileFilter = (req, file, cb) => {
@@ -39,18 +36,34 @@ const upload = multer({
     limits: { fileSize: 15 * 1024 * 1024 },
     fileFilter: fileFilter
 });
-// --- Akhir Konfigurasi Multer ---
 
 
 // =======================================================
-// ===     RUTE-RUTE CRUD (Create, Read, Update, Delete) ===
+// ===               Route List              ===
 // =======================================================
 
 // --- CREATE (C) ---
-// Endpoint untuk memproses file dan mendapatkan JSON hasil OCR.
-router.post('/process-ocr',  upload.array('documentFiles', 10), ocrController.processOcrOnly);
+// 1. Endpoint terpadu untuk memproses OCR
+router.post(
+    '/process', 
+    upload.array('documentFiles', 10), // Menggunakan .array() untuk multi-file
+    ocrController.processOcrOnly
+);
+
+// 2. Endpoint untuk menyimpan data hasil OCR
+router.post('/submit', ocrController.submitData);
 
 
+/*
+// --- READ (R) ---
+router.get('/get-invoice', ocrController.getAllInvoices);
+router.get('/:id', ocrController.getInvoiceById);
 
+// --- UPDATE (U) ---
+router.put('/:id', ocrController.updateInvoice);
+
+// --- DELETE (D) ---
+router.delete('/:id', ocrController.deleteInvoice);
+*/
 
 module.exports = router;
