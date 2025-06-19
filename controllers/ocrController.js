@@ -162,7 +162,7 @@ exports.submitData = catchAsync(async (req, res, next) => {
                 jenis: content.data_kendaraan?.jenis,
                 model: content.data_kendaraan?.model,
                 tahunPembuatan: content.data_kendaraan?.tahun_pembuatan,
-                isiSilinder: content.data_kendaraan?.isi_silinder,
+                isiSilinderDayaListrik: content.data_kendaraan?.isi_silinder,
                 nomorRangka: content.data_kendaraan?.nomor_rangka,
                 nomorMesin: content.data_kendaraan?.nomor_mesin,
                 nik: content.data_kendaraan?.nik,
@@ -171,7 +171,7 @@ exports.submitData = catchAsync(async (req, res, next) => {
                 warnaTnkb: content.data_kendaraan?.warna_tnkb,
                 tahunRegistrasi: content.data_kendaraan?.tahun_registrasi,
                 nomorBpkb: content.data_kendaraan?.nomor_bpkb,
-                noUrutPendaftaran: content.data_kendaraan?.no_urut_pendaftaran,
+                nomorUrutPendaftaran: content.data_kendaraan?.nomor_urut_pendaftaran,
                 kodeLokasi: content.data_kendaraan?.kode_lokasi,
                 berlakuSampai: convDate(content.data_kendaraan?.berlaku_sampai),
                 rawOcrText: raw_ocr_text
@@ -206,6 +206,7 @@ exports.submitData = catchAsync(async (req, res, next) => {
                 atpmImportir: content.dokumen_registrasi_pertama?.atpm_importir,
                 nomorPib: content.dokumen_registrasi_pertama?.nomor_pib,
                 nomorsut: content.dokumen_registrasi_pertama?.nomor_sut,
+                nomortpt: content.dokumen_registrasi_pertama?.nomor_tpt,
                 noFormAbc: content.dokumen_registrasi_pertama?.no_form_abc,
                 kantorBeaCukai: content.dokumen_registrasi_pertama?.kantor_bea_cukai,
                 noRisalahLelang: content.dokumen_registrasi_pertama?.no_risalah_lelang,
@@ -226,4 +227,55 @@ exports.submitData = catchAsync(async (req, res, next) => {
         message: `Data ${document_type} berhasil disimpan.`,
         data: result
     });
+});
+
+// --- FUNGSI UNTUK INVOICE ---
+exports.getAllInvoices = catchAsync(async (req, res, next) => {
+    const invoices = await Invoice.findAll({
+        order: [['createdAt', 'DESC']], // Urutkan dari yang terbaru
+        // Pilih hanya kolom yang relevan untuk tampilan daftar
+        attributes: ['id', 'documentNumber', 'vendorName', 'issueDate', 'grandTotal'] 
+    });
+    res.status(200).json({ status: 'success', results: invoices.length, data: invoices });
+});
+
+exports.getInvoiceById = catchAsync(async (req, res, next) => {
+    const invoice = await Invoice.findByPk(req.params.id, {
+        // Sertakan semua item-itemnya
+        include: [{ model: InvoiceItem, as: 'lineItems' }]
+    });
+    if (!invoice) return next(new AppError('Invoice dengan ID tersebut tidak ditemukan.', 404));
+    res.status(200).json({ status: 'success', data: invoice });
+});
+
+
+// --- FUNGSI UNTUK STNK ---
+exports.getAllStnks = catchAsync(async (req, res, next) => {
+    const stnks = await Stnk.findAll({
+        order: [['createdAt', 'DESC']],
+        attributes: ['id', 'nomorRegistrasi', 'namaPemilik', 'merk', 'berlakuSampai']
+    });
+    res.status(200).json({ status: 'success', results: stnks.length, data: stnks });
+});
+
+exports.getStnkById = catchAsync(async (req, res, next) => {
+    const stnk = await Stnk.findByPk(req.params.id);
+    if (!stnk) return next(new AppError('STNK dengan ID tersebut tidak ditemukan.', 404));
+    res.status(200).json({ status: 'success', data: stnk });
+});
+
+
+// --- FUNGSI UNTUK BPKB ---
+exports.getAllBpkbs = catchAsync(async (req, res, next) => {
+    const bpkbs = await Bpkb.findAll({
+        order: [['createdAt', 'DESC']],
+        attributes: ['id', 'nomorBpkb', 'nomorRegistrasi', 'namaPemilik', 'merk']
+    });
+    res.status(200).json({ status: 'success', results: bpkbs.length, data: bpkbs });
+});
+
+exports.getBpkbById = catchAsync(async (req, res, next) => {
+    const bpkb = await Bpkb.findByPk(req.params.id);
+    if (!bpkb) return next(new AppError('BPKB dengan ID tersebut tidak ditemukan.', 404));
+    res.status(200).json({ status: 'success', data: bpkb });
 });

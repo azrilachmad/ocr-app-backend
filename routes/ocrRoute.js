@@ -54,16 +54,17 @@ router.post(
 router.post('/submit', ocrController.submitData);
 
 
-/*
-// --- READ (R) ---
-router.get('/get-invoice', ocrController.getAllInvoices);
-router.get('/:id', ocrController.getInvoiceById);
+// --- READ (UNTUK DATATABLE & DETAIL) ---
+// Rute untuk Invoice
+router.get('/invoices', ocrController.getAllInvoices);
+router.get('/invoices/:id', ocrController.getInvoiceById);
 
-// --- UPDATE (U) ---
-router.put('/:id', ocrController.updateInvoice);
+// Rute untuk STNK
+router.get('/stnks', ocrController.getAllStnks);
+router.get('/stnks/:id', ocrController.getStnkById);
 
-// --- DELETE (D) ---
-router.delete('/:id', ocrController.deleteInvoice);
-*/
+// Rute untuk BPKB
+router.get('/bpkbs', ocrController.getAllBpkbs);
+router.get('/bpkbs/:id', ocrController.getBpkbById);
 
 module.exports = router;
