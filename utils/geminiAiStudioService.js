@@ -142,7 +142,7 @@ Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan):
     "jenis": "string | null",
     "model": "string | null",
     "tahun_pembuatan": "string | null",
-    "isi_silinder": "string | null",
+    "isi_silinder_daya_listrik": "string | null",
     "nomor_rangka": "string | null",
     "nomor_mesin": "string | null",
     "nik": "string | null",
