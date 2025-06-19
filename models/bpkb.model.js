@@ -4,7 +4,7 @@ const sequelize = require('../config/db');
 
 const Bpkb = sequelize.define('Bpkb', {
     id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
-    no: { type: DataTypes.STRING, field: 'no' },
+    nomorBpkb: { type: DataTypes.STRING, field: 'no' },
     namaPemilik: { type: DataTypes.STRING, field: 'nama_pemilik' },
     pekerjaan: { type: DataTypes.STRING, field: 'pekerjaan' },
     alamat: { type: DataTypes.TEXT, field: 'alamat' },
@@ -31,6 +31,7 @@ const Bpkb = sequelize.define('Bpkb', {
     atpmImportir: { type: DataTypes.STRING, field: 'atpm_importir' },
     nomorPib: { type: DataTypes.STRING, field: 'nomor_pib' },
     nomorSut: { type: DataTypes.STRING, field: 'nomor_sut' },
+    nomorTpt: { type: DataTypes.STRING, field: 'nomor_tpt' },
     noFormAbc: { type: DataTypes.STRING, field: 'no_form_abc' },
     kantorBeaCukai: { type: DataTypes.STRING, field: 'kantor_bea_cukai' },
     noRisalahLelang: { type: DataTypes.STRING, field: 'no_risalah_lelang' },
