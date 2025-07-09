@@ -37,7 +37,6 @@ const upload = multer({
     fileFilter: fileFilter
 });
 
-
 // =======================================================
 // ===               Route List              ===
 // =======================================================
@@ -48,6 +47,13 @@ router.post(
     '/process', 
     upload.array('documentFiles', 10), // Menggunakan .array() untuk multi-file
     ocrController.processOcrOnly
+);
+
+// Rute untuk UploadedFile
+router.post(
+    '/submit',
+    upload.array('documentFiles', 10), // Mengharapkan BANYAK file dengan field 'documentFiles'
+    ocrController.submitData
 );
 
 // 2. Endpoint untuk menyimpan data hasil OCR
@@ -66,5 +72,7 @@ router.get('/stnks/:id', ocrController.getStnkById);
 // Rute untuk BPKB
 router.get('/bpkbs', ocrController.getAllBpkbs);
 router.get('/bpkbs/:id', ocrController.getBpkbById);
+
+
 
 module.exports = router;
