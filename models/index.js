@@ -1,26 +1,36 @@
 // File: models/index.js
-
 'use strict';
-
-const sequelize = require('../config/db'); // Mengambil instance sequelize dari config
+const sequelize = require('../config/db');
 const Sequelize = require('sequelize');
 
 const db = {};
 
-// Impor semua model yang telah kita definisikan
+// 1. Impor SEMUA model Anda terlebih dahulu
 db.Invoice = require('./invoice.model.js');
 db.InvoiceItem = require('./invoiceItem.model.js');
 db.Stnk = require('./stnk.model.js');
 db.Bpkb = require('./bpkb.model.js');
+db.UploadedFile = require('./uploadedFile.model.js'); // <-- Pastikan ini ada
 
-// Definisikan relasi antar model di sini
-// Contoh: Satu Invoice memiliki banyak Item
-db.Invoice.hasMany(db.InvoiceItem, { as: 'lineItems', foreignKey: 'invoiceId' });
+// 2. Definisikan SEMUA relasi setelah semua model diimpor
+// Relasi Invoice -> InvoiceItem
+db.Invoice.hasMany(db.InvoiceItem, { as: 'lineItems', foreignKey: 'invoiceId', onDelete: 'CASCADE' });
 db.InvoiceItem.belongsTo(db.Invoice, { foreignKey: 'invoiceId' });
 
+// Relasi Polymorphic untuk File
+const documentModels = [db.Invoice, db.Stnk, db.Bpkb];
+documentModels.forEach(model => {
+    model.hasOne(db.UploadedFile, {
+        foreignKey: 'documentId',
+        constraints: false,
+        scope: {
+            documentType: model.name.toLowerCase() // 'invoice', 'stnk', atau 'bpkb'
+        }
+    });
+    db.UploadedFile.belongsTo(model, { foreignKey: 'documentId', constraints: false });
+});
 
-// Lampirkan instance sequelize dan Sequelize ke objek db
-// agar bisa diakses dari file lain jika diperlukan
+// 3. Ekspor semua yang diperlukan
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
