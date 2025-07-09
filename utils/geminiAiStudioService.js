@@ -236,6 +236,55 @@ INSTRUKSI PENTING:
 `;
 
 
+const promptGeneralInsight = (ocrText) => `
+    Sebagai seorang business analyst, analisis teks dari dokumen berikut.
+    Berikan output dalam format JSON berisi ringkasan, poin-poin kunci, dan insight penting.
+    Identifikasi juga meta dokumen seperti penulis atau tanggal.
+    
+    PENTING:
+    1. Berikan tebakan KATEGORI UMUM untuk dokumen ini di field "possible_document_type". Contoh kategori: "Ebook", "CV", "Surat Resmi", "Formulir", "Ijazah", "Kartu Identitas", dan lain-lain.
+    2. Seluruh output dan teks di dalam JSON harus dalam Bahasa Indonesia.
+
+    Teks Dokumen:
+    \`\`\`text
+    ${ocrText}
+    \`\`\`
+
+    Format JSON Output yang Diharapkan:
+    {
+      "ringkasan": "string",
+      "poin_kunci": [
+        "string",
+        "string",
+        "..."
+      ],
+      "insight_potensial": "string",
+      "meta_dokumen": {
+        "kemungkinan_penulis": "string | null",
+        "kemungkinan_tanggal_terbit": "string (YYYY-MM-DD) | null",
+        "possible_document_type": "string"
+      }
+    }
+`;
+
+async function getInsightsFromDocument(ocrText) {
+    const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash-latest",
+        generationConfig: { responseMimeType: "application/json" } // Meminta output JSON
+    });
+
+    const prompt = promptGeneralInsight(ocrText);
+    try {
+        const result = await model.generateContent(prompt);
+        return JSON.parse(result.response.text());
+    } catch (error) {
+        console.error("Error saat mendapatkan insight dari dokumen:", error);
+        throw new Error("Gagal menganalisis dokumen umum dengan Gemini.");
+    }
+}
+
+
+
 async function identifyDocumentType(ocrText) {
   const models = genAI.getGenerativeModel({
     model: "gemini-1.5-flash-latest", // Atau "gemini-pro"
@@ -356,4 +405,4 @@ async function extractDetailsWithGemini(ocrText, type) {
   }
 }
 
-module.exports = { extractDetailsWithGemini, identifyDocumentType };
+module.exports = { extractDetailsWithGemini, identifyDocumentType, getInsightsFromDocument  };
