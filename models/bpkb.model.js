@@ -40,6 +40,11 @@ const Bpkb = sequelize.define('Bpkb', {
     jenisPerubahan: { type: DataTypes.STRING, field: 'jenis_perubahan' },
     lokasiPerubahanDikeluarkan: { type: DataTypes.STRING, field: 'lokasi_perubahan_dikeluarkan' },
     tanggalPerubahanDikeluarkan: { type: DataTypes.DATEONLY, field: 'tanggal_perubahan_dikeluarkan' },
+    // Data mentah untuk referensi
+    rawOcrText: {
+        type: DataTypes.TEXT('long'),
+        field: 'raw_ocr_text'
+    }
 }, {
     tableName: 'bpkbs',
     underscored: true,
