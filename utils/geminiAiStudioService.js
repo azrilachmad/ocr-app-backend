@@ -4,18 +4,16 @@ const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@googl
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY") {
-  console.error("KRITIKAL: GEMINI_API_KEY tidak valid atau belum diatur di file .env. Aplikasi mungkin tidak akan berfungsi dengan benar.");
-  // Untuk aplikasi produksi, sebaiknya throw error di sini agar aplikasi tidak berjalan tanpa API key yang valid.
-  // throw new Error("KRITIKAL: GEMINI_API_KEY tidak valid atau belum diatur.");
+  console.error("ERROR: GEMINI_API_KEY tidak valid atau belum diatur di file .env. Aplikasi mungkin tidak akan berfungsi dengan benar.");
 }
 
-// Definisikan generationConfig dan safetySettings di sini agar mudah diakses dan konsisten
+//  generationConfig dan safetySettings
 const generationConfig = {
   temperature: 0.1, // Rendah untuk output yang lebih konsisten dan faktual
   topP: 0.95,
   topK: 40,
-  maxOutputTokens: 4096, // Pastikan cukup untuk JSON output yang kompleks
-  responseMimeType: "application/json", // SANGAT PENTING untuk meminta output JSON langsung
+  maxOutputTokens: 4096, // untuk JSON output yang kompleks
+  responseMimeType: "application/json", // untuk meminta output JSON langsung
 };
 
 const safetySettings = [
@@ -34,7 +32,6 @@ const model = genAI.getGenerativeModel({
 
 
 // Fungsi untuk membuat prompt
-// PASTIKAN ANDA MENYALIN SELURUH SKEMA JSON ANDA DI SINI
 const promptInvoice = (ocrText) => `
     Anda adalah sistem AI yang sangat canggih untuk ekstraksi data dari teks invoice hasil OCR dari industri farmasi dan alat kesehatan di Indonesia.
     Tugas Anda adalah membaca teks berikut, mengidentifikasi semua informasi kunci, dan mengembalikannya dalam format JSON yang ketat.
@@ -235,8 +232,50 @@ INSTRUKSI PENTING:
 5. Output hanya berupa JSON valid tanpa tambahan penjelasan, markdown, atau komentar apa pun.
 `;
 
+const promptKTP = (ocrText) => `
+Anda adalah sistem AI yang sangat canggih untuk ekstraksi data dari dokumen KTP di Indonesia.
+Tugas Anda adalah membaca teks hasil OCR berikut, mengidentifikasi semua informasi penting, dan mengembalikannya dalam format JSON yang ketat dan sesuai.
 
-const promptGeneralInsight = (ocrText) => `
+Teks KTP (hasil OCR):
+\`\`\`text
+${ocrText}
+\`\`\`
+
+Format JSON yang WAJIB diikuti (gunakan nilai null jika tidak ditemukan, namun sebisa mungkin isi semua data):
+
+{
+  "data_penduduk": {
+    "nik": "string | null", // identifikasi format NIK (16 digit angka, contoh: 3277024156270024 )
+    "nama": "string | null", // identifikasi format NIK (16 digit angka, contoh: 3277024156270024 )
+    "tempat_tgl_lahir": "string | null",
+    "jenis_kelamin": "string | null",
+    "gol_darah": "string | null",
+    "alamat": "string | null",
+    "rt": "string | null",
+    "rw": "string | null",
+    "kel_desa": "string | null",
+    "kecamatan": "string | null",
+    "agama": "string | null",
+    "status_perkawinan": "string | null",
+    "kewarganegaraan": "string | null",
+    "berlaku_hingga": "string | null",
+    "provinsi": "string | null",
+    "kabupaten_kota": "string | null",
+    "tanggal_dibuat": "string | null" (sebelum tanda tangan pada KTP),
+  },
+  "catatan_khusus": "string | null"
+}
+
+INSTRUKSI PENTING:
+1. Seluruh data wajib diidentifikasi dan diisi, terutama NIK dan Nama.
+2. Patuhi struktur JSON secara ketat.
+3. Konversi semua tanggal ke format YYYY-MM-DD bila memungkinkan.
+4. Bersihkan teks dari karakter yang tidak relevan seperti titik dua ganda, spasi berlebih, atau pemisah yang tidak standar.
+5. Jika nilai tidak ditemukan, isi dengan **null**.
+6. Output HANYA berupa JSON valid tanpa teks tambahan, komentar, atau markdown.
+`;
+
+const promptGeneralDocument = (ocrText) => `
     Sebagai seorang business analyst, analisis teks dari dokumen berikut.
     Berikan output dalam format JSON berisi ringkasan, poin-poin kunci, dan insight penting.
     Identifikasi juga meta dokumen seperti penulis atau tanggal.
@@ -273,7 +312,7 @@ async function getInsightsFromDocument(ocrText) {
         generationConfig: { responseMimeType: "application/json" } // Meminta output JSON
     });
 
-    const prompt = promptGeneralInsight(ocrText);
+    const prompt = promptGeneralDocument(ocrText);
     try {
         const result = await model.generateContent(prompt);
         return JSON.parse(result.response.text());
@@ -290,12 +329,14 @@ async function identifyDocumentType(ocrText) {
     model: "gemini-1.5-flash-latest", // Atau "gemini-pro"
   });
 const prompt = `
-    Analisis teks berikut dan tentukan jenisnya. Jawabanmu HARUS 'INVOICE', 'STNK', 'BPKB', atau 'TIDAK_DIKETAHUI'.
+    Analisis teks berikut dan tentukan jenisnya. Jawabanmu HARUS 'INVOICE', 'STNK', 'BPKB', 'KTP', atau 'TIDAK_DIKETAHUI'.
     
     Petunjuk:
     - BPKB adalah dokumen berbentuk buku yang berisi salah satu ini, "Identitas Pemilik", "Identitas Kendaraan", dan "Dokumen Registrasi Pertama", "Informasi Perubahan".
     - STNK adalah Surat Tanda Nomor Kendaraan Bermotor berupa satu lembar yang berisi detail pajak tahunan seperti "PKB" dan "SWDKLLJ".
     - INVOICE adalah tagihan pembayaran dengan rincian item, harga, dan total.
+    - KTP adalah Kartu Tanda Penduduk yang berisi informasi pribadi seperti NIK, nama, alamat, dan tanggal lahir.
+    - TIDAK_DIKETAHUI jika tidak dapat diidentifikasi dari pilihan di atas.
 
     Jawabanmu hanya satu kata saja.
 
@@ -303,7 +344,7 @@ const prompt = `
 `;  try {
     const result = await models.generateContent(prompt);
     const documentType = result.response.text().trim().toUpperCase();
-    if (['INVOICE', 'STNK', 'BPKB'].includes(documentType)) {
+    if (['INVOICE', 'STNK', 'BPKB', 'KTP'].includes(documentType)) {
       return documentType;
     }
     return 'TIDAK_DIKETAHUI';
@@ -322,7 +363,11 @@ async function extractDetailsWithGemini(ocrText, type) {
     throw new Error("Teks OCR yang diberikan kosong atau tidak valid. Tidak dapat diproses oleh Gemini.");
   }
 
-  const fullPrompt = type === 'INVOICE' ? promptInvoice(ocrText) : type === 'STNK' ? promptSTNK(ocrText) : promptBPKB(ocrText);
+  const fullPrompt = 
+  type === 'INVOICE' ? promptInvoice(ocrText) 
+  : type === 'STNK' ? promptSTNK(ocrText) 
+  : type === 'KTP' ? promptKTP(ocrText) 
+  : promptBPKB(ocrText);
 
   console.log("INFO: Mengirim permintaan ke Gemini API...");
   // Untuk debug prompt, uncomment baris berikut:
