@@ -8,7 +8,7 @@ const { extractTextWithVisionAI } = require('../utils/googleVisionService');
 const { extractDetailsWithGemini, identifyDocumentType, getInsightsFromDocument } = require('../utils/geminiAiStudioService');
 
 
-const { Invoice, InvoiceItem, Stnk, Bpkb, UploadedFile, sequelize } = require('../models'); // Pastikan path ini benar
+const { Invoice, InvoiceItem, Stnk, Bpkb, UploadedFile, GeneralDocument, Ktp, sequelize } = require('../models'); // Pastikan path ini benar
 const { convDate } = require('../helper');
 const { raw } = require('body-parser');
 
@@ -39,7 +39,7 @@ exports.processOcrOnly = catchAsync(async (req, res, next) => {
         let responseData;
 
         // 3. Logika Kondisional: Ekstrak data terstruktur atau dapatkan insight
-        if (['INVOICE', 'STNK', 'BPKB'].includes(documentType)) {
+        if (['INVOICE', 'STNK', 'BPKB', 'KTP'].includes(documentType)) {
             // JALUR A: Dokumen dikenali
             const extractedData = await extractDetailsWithGemini(combinedOcrText, documentType);
             responseData = {
@@ -54,7 +54,7 @@ exports.processOcrOnly = catchAsync(async (req, res, next) => {
                 content: insights
             };
         }
-        
+
         // Selalu sertakan teks mentah dalam konten untuk referensi
         responseData.content.raw_ocr_text = combinedOcrText;
 
@@ -78,7 +78,7 @@ exports.processOcrOnly = catchAsync(async (req, res, next) => {
  */
 exports.submitData = catchAsync(async (req, res, next) => {
     // Data dari frontend memiliki struktur: { document_type, content }
-    const { document_type, userDefinedFilename, content} = req.body;
+    const { document_type, userDefinedFilename, content } = req.body;
     const files = req.files; // Ini sekarang sebuah array
 
     const parsedData = JSON.parse(content); // Pastikan content adalah string JSON
@@ -96,137 +96,175 @@ exports.submitData = catchAsync(async (req, res, next) => {
     const filePaths = files.map(f => f.path); // Kumpulkan path untuk dibersihkan nanti
     try {
         switch (document_type) {
-        case 'INVOICE':
-            result = await sequelize.transaction(async (t) => {
-                const newInvoice = await Invoice.create({
-                    invoiceType: parsedData.content.informasi_umum?.tipe_dokumen?.toLowerCase().includes('pembelian') ? 'pembelian' : 'penjualan',
-                    documentTitle: parsedData.content.informasi_umum?.judul_dokumen,
-                    documentNumber: parsedData.content.informasi_umum?.nomor_dokumen,
-                    taxInvoiceNumber: parsedData.content.informasi_umum?.nomor_faktur_pajak,
-                    purchaseOrderNumber: parsedData.content.informasi_umum?.nomor_purchase_order,
-                    salesOrderNumber: parsedData.content.informasi_umum?.nomor_sales_order,
-                    issueDate: convDate(parsedData.content.informasi_umum?.tanggal_terbit),
-                    dueDate: convDate(parsedData.content.informasi_umum?.tanggal_jatuh_tempo),
-                    salespersonName: parsedData.content.informasi_umum?.nama_salesman,
-                    vendorName: parsedData.content.pihak_terlibat?.vendor?.nama,
-                    vendorAddress: parsedData.content.pihak_terlibat?.vendor?.alamat,
-                    vendorPhone: parsedData.content.pihak_terlibat?.vendor?.telepon,
-                    vendorNpwp: parsedData.content.pihak_terlibat?.vendor?.npwp,
-                    customerName: parsedData.content.pihak_terlibat?.pelanggan?.nama,
-                    customerBillingAddress: parsedData.content.pihak_terlibat?.pelanggan?.alamat_penagihan,
-                    customerShippingAddress: parsedData.content.pihak_terlibat?.pelanggan?.alamat_pengiriman,
-                    customerPhone: parsedData.content.pihak_terlibat?.pelanggan?.telepon,
-                    customerNpwp: parsedData.content.pihak_terlibat?.pelanggan?.npwp,
-                    subtotal: parsedData.content.rekapitulasi_finansial?.subtotal,
-                    globalDiscountAmount: parsedData.content.rekapitulasi_finansial?.total_diskon_global_jumlah,
-                    taxableAmountDpp: parsedData.content.rekapitulasi_finansial?.dasar_pengenaan_pajak_dpp,
-                    vatAmount: parsedData.content.rekapitulasi_finansial?.pajak_ppn_jumlah,
-                    shippingCost: parsedData.content.rekapitulasi_finansial?.ongkos_kirim,
-                    stampDutyFee: parsedData.content.rekapitulasi_finansial?.biaya_meterai,
-                    grandTotal: parsedData.content.rekapitulasi_finansial?.total_tagihan_akhir,
-                    currency: parsedData.content.rekapitulasi_finansial?.mata_uang,
-                    amountInWords: parsedData.content.rekapitulasi_finansial?.terbilang,
-                    paymentMethod: parsedData.content.detail_pembayaran?.metode,
-                    paymentBankName: parsedData.content.detail_pembayaran?.nama_bank,
-                    paymentAccountNumber: parsedData.content.detail_pembayaran?.nomor_rekening,
-                    paymentAccountName: parsedData.content.detail_pembayaran?.nama_pemilik_rekening,
-                    signerName: parsedData.content.informasi_legal_otorisasi?.nama_penandatangan,
-                    signerPosition: parsedData.content.informasi_legal_otorisasi?.jabatan_penandatangan,
-                    sipaNumber: parsedData.content.informasi_legal_otorisasi?.nomor_sipa,
-                    sikNumber: parsedData.content.informasi_legal_otorisasi?.nomor_sik,
-                    notes: parsedData.content.informasi_legal_otorisasi?.catatan,
+            case 'INVOICE':
+                result = await sequelize.transaction(async (t) => {
+                    const newInvoice = await Invoice.create({
+                        invoiceType: parsedData.content.informasi_umum?.tipe_dokumen?.toLowerCase().includes('pembelian') ? 'pembelian' : 'penjualan',
+                        documentTitle: parsedData.content.informasi_umum?.judul_dokumen,
+                        documentNumber: parsedData.content.informasi_umum?.nomor_dokumen,
+                        taxInvoiceNumber: parsedData.content.informasi_umum?.nomor_faktur_pajak,
+                        purchaseOrderNumber: parsedData.content.informasi_umum?.nomor_purchase_order,
+                        salesOrderNumber: parsedData.content.informasi_umum?.nomor_sales_order,
+                        issueDate: convDate(parsedData.content.informasi_umum?.tanggal_terbit),
+                        dueDate: convDate(parsedData.content.informasi_umum?.tanggal_jatuh_tempo),
+                        salespersonName: parsedData.content.informasi_umum?.nama_salesman,
+                        vendorName: parsedData.content.pihak_terlibat?.vendor?.nama,
+                        vendorAddress: parsedData.content.pihak_terlibat?.vendor?.alamat,
+                        vendorPhone: parsedData.content.pihak_terlibat?.vendor?.telepon,
+                        vendorNpwp: parsedData.content.pihak_terlibat?.vendor?.npwp,
+                        customerName: parsedData.content.pihak_terlibat?.pelanggan?.nama,
+                        customerBillingAddress: parsedData.content.pihak_terlibat?.pelanggan?.alamat_penagihan,
+                        customerShippingAddress: parsedData.content.pihak_terlibat?.pelanggan?.alamat_pengiriman,
+                        customerPhone: parsedData.content.pihak_terlibat?.pelanggan?.telepon,
+                        customerNpwp: parsedData.content.pihak_terlibat?.pelanggan?.npwp,
+                        subtotal: parsedData.content.rekapitulasi_finansial?.subtotal,
+                        globalDiscountAmount: parsedData.content.rekapitulasi_finansial?.total_diskon_global_jumlah,
+                        taxableAmountDpp: parsedData.content.rekapitulasi_finansial?.dasar_pengenaan_pajak_dpp,
+                        vatAmount: parsedData.content.rekapitulasi_finansial?.pajak_ppn_jumlah,
+                        shippingCost: parsedData.content.rekapitulasi_finansial?.ongkos_kirim,
+                        stampDutyFee: parsedData.content.rekapitulasi_finansial?.biaya_meterai,
+                        grandTotal: parsedData.content.rekapitulasi_finansial?.total_tagihan_akhir,
+                        currency: parsedData.content.rekapitulasi_finansial?.mata_uang,
+                        amountInWords: parsedData.content.rekapitulasi_finansial?.terbilang,
+                        paymentMethod: parsedData.content.detail_pembayaran?.metode,
+                        paymentBankName: parsedData.content.detail_pembayaran?.nama_bank,
+                        paymentAccountNumber: parsedData.content.detail_pembayaran?.nomor_rekening,
+                        paymentAccountName: parsedData.content.detail_pembayaran?.nama_pemilik_rekening,
+                        signerName: parsedData.content.informasi_legal_otorisasi?.nama_penandatangan,
+                        signerPosition: parsedData.content.informasi_legal_otorisasi?.jabatan_penandatangan,
+                        sipaNumber: parsedData.content.informasi_legal_otorisasi?.nomor_sipa,
+                        sikNumber: parsedData.content.informasi_legal_otorisasi?.nomor_sik,
+                        notes: parsedData.content.informasi_legal_otorisasi?.catatan,
+                        tanggal_diproses: convDate(parsedData.tanggal_diproses) || new Date(),
+                        rawOcrText: parsedData.raw_ocr_text
+                    }, { transaction: t });
+                    const lineItems = parsedData.content.item_baris;
+                    if (lineItems && lineItems.length > 0) {
+                        const itemsToCreate = lineItems.map(item => ({
+                            invoiceId: newInvoice.id,
+                            description: item.deskripsi,
+                            quantity: item.kuantitas,
+                            unit: item.satuan,
+                            unitPrice: item.harga_satuan,
+                            discountPercentage: item.diskon_persen,
+                            discountAmount: item.diskon_jumlah,
+                            totalPrice: item.total_harga,
+                            batchNumber: item.nomor_batch,
+                            expiryDate: convDate(item.tanggal_kedaluwarsa)
+                        }));
+                        await InvoiceItem.bulkCreate(itemsToCreate, { transaction: t });
+                    }
+                    return newInvoice;
+                });
+                break;
+            case 'STNK':
+                result = await Stnk.create({
+                    no: `${parsedData.content.data_kendaraan?.no}`,
+                    nomorRegistrasi: parsedData.content.data_kendaraan?.nomor_registrasi,
+                    namaPemilik: parsedData.content.data_kendaraan?.nama_pemilik,
+                    alamat: parsedData.content.data_kendaraan?.alamat,
+                    merk: parsedData.content.data_kendaraan?.merk,
+                    tipe: parsedData.content.data_kendaraan?.tipe,
+                    jenis: parsedData.content.data_kendaraan?.jenis,
+                    model: parsedData.content.data_kendaraan?.model,
+                    tahunPembuatan: parsedData.content.data_kendaraan?.tahun_pembuatan,
+                    isiSilinderDayaListrik: parsedData.content.data_kendaraan?.isi_silinder,
+                    nomorRangka: parsedData.content.data_kendaraan?.nomor_rangka,
+                    nomorMesin: parsedData.content.data_kendaraan?.nomor_mesin,
+                    nik: parsedData.content.data_kendaraan?.nik,
+                    warna: parsedData.content.data_kendaraan?.warna,
+                    bahanBakar: parsedData.content.data_kendaraan?.bahan_bakar,
+                    warnaTnkb: parsedData.content.data_kendaraan?.warna_tnkb,
+                    tahunRegistrasi: parsedData.content.data_kendaraan?.tahun_registrasi,
+                    nomorBpkb: parsedData.content.data_kendaraan?.nomor_bpkb,
+                    nomorUrutPendaftaran: parsedData.content.data_kendaraan?.nomor_urut_pendaftaran,
+                    kodeLokasi: parsedData.content.data_kendaraan?.kode_lokasi,
+                    berlakuSampai: convDate(parsedData.content.data_kendaraan?.berlaku_sampai),
+                    tanggal_diproses: convDate(parsedData.tanggal_diproses) || new Date(),
                     rawOcrText: parsedData.raw_ocr_text
-                }, { transaction: t });
-                const lineItems = parsedData.content.item_baris;
-                if (lineItems && lineItems.length > 0) {
-                    const itemsToCreate = lineItems.map(item => ({
-                        invoiceId: newInvoice.id,
-                        description: item.deskripsi,
-                        quantity: item.kuantitas,
-                        unit: item.satuan,
-                        unitPrice: item.harga_satuan,
-                        discountPercentage: item.diskon_persen,
-                        discountAmount: item.diskon_jumlah,
-                        totalPrice: item.total_harga,
-                        batchNumber: item.nomor_batch,
-                        expiryDate: convDate(item.tanggal_kedaluwarsa)
-                    }));
-                    await InvoiceItem.bulkCreate(itemsToCreate, { transaction: t });
-                }
-                return newInvoice;
-            });
-            break;
-        case 'STNK':
-            result = await Stnk.create({
-                no: `${parsedData.content.data_kendaraan?.no}`,
-                nomorRegistrasi: parsedData.content.data_kendaraan?.nomor_registrasi,
-                namaPemilik: parsedData.content.data_kendaraan?.nama_pemilik,
-                alamat: parsedData.content.data_kendaraan?.alamat,
-                merk: parsedData.content.data_kendaraan?.merk,
-                tipe: parsedData.content.data_kendaraan?.tipe,
-                jenis: parsedData.content.data_kendaraan?.jenis,
-                model: parsedData.content.data_kendaraan?.model,
-                tahunPembuatan: parsedData.content.data_kendaraan?.tahun_pembuatan,
-                isiSilinderDayaListrik: parsedData.content.data_kendaraan?.isi_silinder,
-                nomorRangka: parsedData.content.data_kendaraan?.nomor_rangka,
-                nomorMesin: parsedData.content.data_kendaraan?.nomor_mesin,
-                nik: parsedData.content.data_kendaraan?.nik,
-                warna: parsedData.content.data_kendaraan?.warna,
-                bahanBakar: parsedData.content.data_kendaraan?.bahan_bakar,
-                warnaTnkb: parsedData.content.data_kendaraan?.warna_tnkb,
-                tahunRegistrasi: parsedData.content.data_kendaraan?.tahun_registrasi,
-                nomorBpkb: parsedData.content.data_kendaraan?.nomor_bpkb,
-                nomorUrutPendaftaran: parsedData.content.data_kendaraan?.nomor_urut_pendaftaran,
-                kodeLokasi: parsedData.content.data_kendaraan?.kode_lokasi,
-                berlakuSampai: convDate(parsedData.content.data_kendaraan?.berlaku_sampai),
-                rawOcrText: parsedData.raw_ocr_text
-            });
-            break;
-        case 'BPKB':
-            result = await Bpkb.create({
-                nomorBpkb: parsedData.content.no,
-                namaPemilik: parsedData.content.identitas_pemilik?.nama_pemilik,
-                pekerjaan: parsedData.content.identitas_pemilik?.pekerjaan,
-                alamat: parsedData.content.identitas_pemilik?.alamat,
-                nomorKtp: parsedData.content.identitas_pemilik?.nomor_ktp,
-                lokasiDikeluarkan: parsedData.content.identitas_pemilik?.lokasi_dikeluarkan,
-                tanggalDikeluarkan: convDate(parsedData.content.identitas_pemilik?.tanggal_dikeluarkan),
-                nomorRegistrasi: parsedData.content.identitas_kendaraan?.nomor_registrasi,
-                merk: parsedData.content.identitas_kendaraan?.merk,
-                tipe: parsedData.content.identitas_kendaraan?.tipe,
-                jenis: parsedData.content.identitas_kendaraan?.jenis,
-                model: parsedData.content.identitas_kendaraan?.model,
-                tahunPembuatan: parsedData.content.identitas_kendaraan?.tahun_pembuatan,
-                isiSilinder: parsedData.content.identitas_kendaraan?.isi_silinder,
-                warna: parsedData.content.identitas_kendaraan?.warna,
-                nomorRangka: parsedData.content.identitas_kendaraan?.nomor_rangka,
-                nomorMesin: parsedData.content.identitas_kendaraan?.nomor_mesin,
-                bahanBakar: parsedData.content.identitas_kendaraan?.bahan_bakar,
-                jumlahSumbu: parsedData.content.identitas_kendaraan?.jumlah_sumbu,
-                jumlahRoda: parsedData.content.identitas_kendaraan?.jumlah_roda,
-                noSertifikatUjiTipe: parsedData.content.identitas_kendaraan?.no_sertifikat_uji_tipe,
-                jenisKendaraanKategori: parsedData.content.identitas_kendaraan?.jenis_kendaraan_kategori,
-                nomorFaktur: parsedData.content.dokumen_registrasi_pertama?.nomor_faktur,
-                tanggal: convDate(parsedData.content.dokumen_registrasi_pertama?.tanggal),
-                atpmImportir: parsedData.content.dokumen_registrasi_pertama?.atpm_importir,
-                nomorPib: parsedData.content.dokumen_registrasi_pertama?.nomor_pib,
-                nomorsut: parsedData.content.dokumen_registrasi_pertama?.nomor_sut,
-                nomortpt: parsedData.content.dokumen_registrasi_pertama?.nomor_tpt,
-                noFormAbc: parsedData.content.dokumen_registrasi_pertama?.no_form_abc,
-                kantorBeaCukai: parsedData.content.dokumen_registrasi_pertama?.kantor_bea_cukai,
-                noRisalahLelang: parsedData.content.dokumen_registrasi_pertama?.no_risalah_lelang,
-                noSkepDum: parsedData.content.dokumen_registrasi_pertama?.no_skep_dum,
-                perubahan: parsedData.content.perubahan?.perubahan,
-                jenisPerubahan: parsedData.content.perubahan?.jenis_perubahan,
-                lokasiPerubahanDikeluarkan: parsedData.content.perubahan?.lokasi_perubahan_dikeluarkan,
-                tanggalPerubahanDikeluarkan: convDate(parsedData.content.perubahan?.tanggal_perubahan_dikeluarkan),
-                catatanKhusus: parsedData.content.catatan_khusus,
-                rawOcrText: parsedData.raw_ocr_text
-            });
-            break;
-        default:
-            return next(new AppError(`Tipe dokumen '${document_type}' tidak didukung untuk disimpan.`, 400));
-    }
+                });
+                break;
+            case 'KTP':
+                result = await Ktp.create({
+                    nik: parsedData.content.data_penduduk?.nik,
+                    nama: parsedData.content.data_penduduk?.nama,
+                    tempat_tgl_lahir: parsedData.content.data_penduduk?.tempat_tgl_lahir,
+                    jenis_kelamin: parsedData.content.data_penduduk?.jenis_kelamin,
+                    gol_darah: parsedData.content.data_penduduk?.gol_darah,
+                    alamat: parsedData.content.data_penduduk?.alamat,
+                    rt: parsedData.content.data_penduduk?.rt,
+                    rw: parsedData.content.data_penduduk?.rw,
+                    kel_desa: parsedData.content.data_penduduk?.kel_desa,
+                    kecamatan: parsedData.content.data_penduduk?.kecamatan,
+                    agama: parsedData.content.data_penduduk?.agama,
+                    status_perkawinan: parsedData.content.data_penduduk?.status_perkawinan,
+                    kewarganegaraan: parsedData.content.data_penduduk?.kewarganegaraan,
+                    berlaku_hingga: parsedData.content.data_penduduk?.berlaku_hingga,
+                    provinsi: parsedData.content.data_penduduk?.provinsi,
+                    kabupaten_kota: parsedData.content.data_penduduk?.kabupaten_kota,
+                    tanggal_dibuat: parsedData.content.data_penduduk?.tanggal_dibuat,
+                    tanggal_diproses: convDate(parsedData.tanggal_diproses) || new Date(),
+                    rawOcrText: parsedData.content.raw_ocr_text
+                });
+                break;
+            case 'BPKB':
+                result = await Bpkb.create({
+                    nomorBpkb: parsedData.content.no,
+                    namaPemilik: parsedData.content.identitas_pemilik?.nama_pemilik,
+                    pekerjaan: parsedData.content.identitas_pemilik?.pekerjaan,
+                    alamat: parsedData.content.identitas_pemilik?.alamat,
+                    nomorKtp: parsedData.content.identitas_pemilik?.nomor_ktp,
+                    lokasiDikeluarkan: parsedData.content.identitas_pemilik?.lokasi_dikeluarkan,
+                    tanggalDikeluarkan: convDate(parsedData.content.identitas_pemilik?.tanggal_dikeluarkan),
+                    nomorRegistrasi: parsedData.content.identitas_kendaraan?.nomor_registrasi,
+                    merk: parsedData.content.identitas_kendaraan?.merk,
+                    tipe: parsedData.content.identitas_kendaraan?.tipe,
+                    jenis: parsedData.content.identitas_kendaraan?.jenis,
+                    model: parsedData.content.identitas_kendaraan?.model,
+                    tahunPembuatan: parsedData.content.identitas_kendaraan?.tahun_pembuatan,
+                    isiSilinder: parsedData.content.identitas_kendaraan?.isi_silinder,
+                    warna: parsedData.content.identitas_kendaraan?.warna,
+                    nomorRangka: parsedData.content.identitas_kendaraan?.nomor_rangka,
+                    nomorMesin: parsedData.content.identitas_kendaraan?.nomor_mesin,
+                    bahanBakar: parsedData.content.identitas_kendaraan?.bahan_bakar,
+                    jumlahSumbu: parsedData.content.identitas_kendaraan?.jumlah_sumbu,
+                    jumlahRoda: parsedData.content.identitas_kendaraan?.jumlah_roda,
+                    noSertifikatUjiTipe: parsedData.content.identitas_kendaraan?.no_sertifikat_uji_tipe,
+                    jenisKendaraanKategori: parsedData.content.identitas_kendaraan?.jenis_kendaraan_kategori,
+                    nomorFaktur: parsedData.content.dokumen_registrasi_pertama?.nomor_faktur,
+                    tanggal: convDate(parsedData.content.dokumen_registrasi_pertama?.tanggal),
+                    atpmImportir: parsedData.content.dokumen_registrasi_pertama?.atpm_importir,
+                    nomorPib: parsedData.content.dokumen_registrasi_pertama?.nomor_pib,
+                    nomorsut: parsedData.content.dokumen_registrasi_pertama?.nomor_sut,
+                    nomortpt: parsedData.content.dokumen_registrasi_pertama?.nomor_tpt,
+                    noFormAbc: parsedData.content.dokumen_registrasi_pertama?.no_form_abc,
+                    kantorBeaCukai: parsedData.content.dokumen_registrasi_pertama?.kantor_bea_cukai,
+                    noRisalahLelang: parsedData.content.dokumen_registrasi_pertama?.no_risalah_lelang,
+                    noSkepDum: parsedData.content.dokumen_registrasi_pertama?.no_skep_dum,
+                    perubahan: parsedData.content.perubahan?.perubahan,
+                    jenisPerubahan: parsedData.content.perubahan?.jenis_perubahan,
+                    lokasiPerubahanDikeluarkan: parsedData.content.perubahan?.lokasi_perubahan_dikeluarkan,
+                    tanggalPerubahanDikeluarkan: convDate(parsedData.content.perubahan?.tanggal_perubahan_dikeluarkan),
+                    catatanKhusus: parsedData.content.catatan_khusus,
+                    tanggal_diproses: convDate(parsedData.tanggal_diproses) || new Date(),
+                    rawOcrText: parsedData.raw_ocr_text
+                });
+                break;
+            case 'DOKUMEN_UMUM':
+                result = await GeneralDocument.create({
+                    summary: parsedData.content.ringkasan || parsedData.content.summary,
+                    keyPoints: parsedData.content.poin_kunci || parsedData.content.key_points,
+                    potentialInsights: parsedData.content.insight_potensial || parsedData.content.potential_insights,
+                    possibleAuthor: parsedData.content.meta_dokumen?.kemungkinan_penulis || parsedData.content.meta_dokumen?.possible_author,
+                    possiblePublishDate: convDate(parsedData.content.meta_dokumen?.kemungkinan_tanggal_terbit || parsedData.content.meta_dokumen?.possible_publish_date),
+                    possibleDocumentType: parsedData.content.meta_dokumen?.possible_document_type,
+                    tanggal_diproses: convDate(parsedData.tanggal_diproses) || new Date(),
+                    rawOcrText: parsedData.content.raw_ocr_text
+                }, { transaction });
+                break;
+            default:
+                return next(new AppError(`Tipe dokumen '${document_type}' tidak didukung untuk disimpan.`, 400));
+        }
 
         // --- BAGIAN KUNCI UNTUK MULTI-FILE ---
         // Buat promise untuk setiap file yang akan disimpan
@@ -238,7 +276,8 @@ exports.submitData = catchAsync(async (req, res, next) => {
                     mimeType: file.mimetype,
                     fileData: fileData,
                     documentId: result.id, // Semua file terhubung ke ID record yang sama
-                    documentType: document_type.toLowerCase()
+                    documentType: document_type.toLowerCase(),
+                    tanggal_diproses: convDate(parsedData.tanggal_diproses) || new Date(),
                 }, { transaction });
             });
         });
