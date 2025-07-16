@@ -44,7 +44,8 @@ const Bpkb = sequelize.define('Bpkb', {
     rawOcrText: {
         type: DataTypes.TEXT('long'),
         field: 'raw_ocr_text'
-    }
+    },
+    tanggal_diproses: { type: DataTypes.DATEONLY, field: 'tanggal_diproses' },
 }, {
     tableName: 'bpkbs',
     underscored: true,

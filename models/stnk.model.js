@@ -25,6 +25,7 @@ const Stnk = sequelize.define('Stnk', {
     nomorUrutPendaftaran: { type: DataTypes.STRING, field: 'nomor_urut_pendaftaran' },
     kodeLokasi: { type: DataTypes.STRING, field: 'kode_lokasi' },
     berlakuSampai: { type: DataTypes.STRING, field: 'berlaku_sampai' },
+    tanggal_diproses: { type: DataTypes.DATEONLY, field: 'tanggal_diproses' },
     rawOcrText: { type: DataTypes.TEXT, field: 'raw_ocr_text' } // Menyimpan teks OCR mentah
 }, {
     tableName: 'stnks',

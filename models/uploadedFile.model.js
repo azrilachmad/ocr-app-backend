@@ -32,7 +32,8 @@ const UploadedFile = sequelize.define('UploadedFile', {
     documentType: {
         type: DataTypes.STRING,
         allowNull: false,
-    }
+    },
+    tanggal_diproses: { type: DataTypes.DATEONLY, field: 'tanggal_diproses' }
 }, {
     tableName: 'uploaded_files',
     underscored: true,

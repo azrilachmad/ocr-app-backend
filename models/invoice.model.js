@@ -86,6 +86,7 @@ const Invoice = sequelize.define('Invoice', {
     sipaNumber: { type: DataTypes.STRING, field: 'sipa_number' },
     sikNumber: { type: DataTypes.STRING, field: 'sik_number' },
     notes: { type: DataTypes.TEXT },
+    tanggal_diproses: { type: DataTypes.DATEONLY, field: 'tanggal_diproses' },
     
     // Data mentah untuk referensi
     rawOcrText: {
