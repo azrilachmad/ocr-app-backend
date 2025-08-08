@@ -357,3 +357,47 @@ exports.getBpkbById = catchAsync(async (req, res, next) => {
     if (!bpkb) return next(new AppError('BPKB dengan ID tersebut tidak ditemukan.', 404));
     res.status(200).json({ status: 'success', data: bpkb });
 });
+
+// --- FUNGSI UNTUK KTP ---
+exports.getAllKtp = catchAsync(async (req, res, next) => {
+    const ktp = await Ktp.findAll({
+        order: [['createdAt', 'DESC']],
+        attributes: ['id', 'nik', 'nama', 'tempat_tgl_lahir', 'jenis_kelamin']
+    });
+    res.status(200).json({ status: 'success', results: ktp.length, data: ktp });
+});
+
+exports.getKtpById = catchAsync(async (req, res, next) => {
+    const ktp = await Ktp.findByPk(req.params.id);
+    if (!ktp) return next(new AppError('KTP dengan ID tersebut tidak ditemukan.', 404));
+    res.status(200).json({ status: 'success', data: ktp });
+});
+
+exports.getFileById = catchAsync(async (req, res, next) => {
+    const { filename, documentId, documentType } = req.query;
+    let whereClause = {};
+
+    // Cek parameter yang diberikan
+    if (documentId && documentType) {
+        // Prioritas utama: cari berdasarkan dokumen induknya (lebih spesifik)
+        whereClause.documentId = documentId;
+        whereClause.documentType = documentType.toLowerCase();
+    } else if (filename) {
+        // Opsi kedua: cari berdasarkan nama yang diberikan pengguna
+        whereClause.userDefinedFilename = filename;
+    } else {
+        // Jika tidak ada parameter yang valid, kembalikan error
+        return next(new AppError('Parameter pencarian tidak valid. Harap berikan filename, atau documentId & documentType.', 400));
+    }
+
+    // Gunakan findOne untuk mengambil file pertama yang cocok.
+    const file = await UploadedFile.findOne({ where: whereClause });
+
+    if (!file) {
+        return next(new AppError('File tidak ditemukan dengan kriteria yang diberikan.', 404));
+    }
+
+    // Set header Content-Type dan kirim data biner
+    res.setHeader('Content-Type', file.mimeType);
+    res.send(file.fileData);
+});

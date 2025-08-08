@@ -73,6 +73,13 @@ router.get('/stnks/:id', ocrController.getStnkById);
 router.get('/bpkbs', ocrController.getAllBpkbs);
 router.get('/bpkbs/:id', ocrController.getBpkbById);
 
+// Rute untuk BPKB
+router.get('/ktp', ocrController.getAllKtp);
+router.get('/ktp/:id', ocrController.getKtpById);
+
+router.get('/files', ocrController.getFileById);
+
+
 
 
 module.exports = router;
