@@ -78,6 +78,8 @@ router.get('/ktp', ocrController.getAllKtp);
 router.get('/ktp/:id', ocrController.getKtpById);
 
 router.get('/files', ocrController.getFileById);
+router.get('/files/:fileId', ocrController.serveFileById);
+
 
 
 

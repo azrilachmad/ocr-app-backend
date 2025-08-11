@@ -373,31 +373,77 @@ exports.getKtpById = catchAsync(async (req, res, next) => {
     res.status(200).json({ status: 'success', data: ktp });
 });
 
+
+const formatFilesForResponse = (files, req) => {
+    if (!files || files.length === 0) {
+        return [];
+    }
+
+    return files.map(file => {
+        // Hapus data biner mentah dari objek JSON akhir
+        const fileJson = file.toJSON();
+        
+        // 1. Buat URL lengkap ke endpoint penyaji gambar
+        const imageUrl = `${req.protocol}://${req.get('host')}/api/ocr/files/${file.id}`;
+
+        // 2. Konversi data biner (Buffer) menjadi string Base64
+        const imageBase64 = `data:${file.mimeType};base64,${file.fileData.toString('base64')}`;
+
+        // Hapus fileData mentah dan tambahkan properti baru
+        delete fileJson.fileData;
+        fileJson.imageUrl = imageUrl;
+        fileJson.imageBase64 = imageBase64;
+        
+        return fileJson;
+    });
+};
+
 exports.getFileById = catchAsync(async (req, res, next) => {
-    const { filename, documentId, documentType } = req.query;
-    let whereClause = {};
+    const { documentType, documentId } = req.query;
 
-    // Cek parameter yang diberikan
-    if (documentId && documentType) {
-        // Prioritas utama: cari berdasarkan dokumen induknya (lebih spesifik)
-        whereClause.documentId = documentId;
-        whereClause.documentType = documentType.toLowerCase();
-    } else if (filename) {
-        // Opsi kedua: cari berdasarkan nama yang diberikan pengguna
-        whereClause.userDefinedFilename = filename;
-    } else {
-        // Jika tidak ada parameter yang valid, kembalikan error
-        return next(new AppError('Parameter pencarian tidak valid. Harap berikan filename, atau documentId & documentType.', 400));
+    if (!documentType || !documentId) {
+        return next(new AppError('Parameter documentType dan documentId wajib diisi.', 400));
     }
 
-    // Gunakan findOne untuk mengambil file pertama yang cocok.
-    const file = await UploadedFile.findOne({ where: whereClause });
+    const files = await UploadedFile.findAll({
+        where: {
+            documentType: documentType.toLowerCase(),
+            documentId: documentId
+        },
+        // Hapus 'fileData' karena akan kita ganti dengan URL
+        attributes: { exclude: ['fileData', 'createdAt', 'updatedAt'] }
+    });
 
+    // Ubah data agar sesuai dengan format JSON yang Anda inginkan
+    const formattedFiles = files.map(file => {
+        const fileJson = file.toJSON();
+        
+        return {
+            id: fileJson.id,
+            user_defined_filename: fileJson.user_defined_filename,
+            original_filename: fileJson.original_filename,
+            mime_type: fileJson.mime_type,
+            // Field 'file_data' sekarang berisi URL ke gambar
+            file_data: `${req.protocol}://${req.get('host')}/api/ocr/files/${file.id}`,
+            document_id: fileJson.document_id,
+            document_type: fileJson.document_type,
+            tanggal_diproses: fileJson.tanggal_diproses // Pastikan kolom ini ada di model Anda
+        };
+    });
+
+    res.status(200).json({
+        status: 'success',
+        results: formattedFiles.length,
+        data: formattedFiles
+    });
+});
+
+// controllers/ocrController.js
+exports.serveFileById = catchAsync(async (req, res, next) => {
+    const file = await UploadedFile.findByPk(req.params.fileId);
     if (!file) {
-        return next(new AppError('File tidak ditemukan dengan kriteria yang diberikan.', 404));
+        return next(new AppError('File tidak ditemukan.', 404));
     }
-
-    // Set header Content-Type dan kirim data biner
     res.setHeader('Content-Type', file.mimeType);
     res.send(file.fileData);
 });
