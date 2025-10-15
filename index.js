@@ -14,7 +14,7 @@ const app = express();
 const port = process.env.PORT || 3001; // Menggunakan port dari .env atau default 3001
 
 // Middleware
-app.use(cors());
+app.use(cors( { origin: '*' } )); // Atur sesuai kebutuhan keamanan Anda
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
