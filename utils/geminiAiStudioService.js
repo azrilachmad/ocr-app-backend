@@ -25,7 +25,7 @@ const safetySettings = [
 
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash-latest", // Atau "gemini-pro" jika diperlukan
+  model: "gemini-2.5-flash", // Atau "gemini-pro" jika diperlukan
   generationConfig, // Set konfigurasi generasi saat inisialisasi model
   safetySettings    // Set konfigurasi keamanan saat inisialisasi model
 });
@@ -308,7 +308,7 @@ const promptGeneralDocument = (ocrText) => `
 
 async function getInsightsFromDocument(ocrText) {
     const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash-latest",
+        model: "gemini-2.5-flash",
         generationConfig: { responseMimeType: "application/json" } // Meminta output JSON
     });
 
@@ -326,7 +326,7 @@ async function getInsightsFromDocument(ocrText) {
 
 async function identifyDocumentType(ocrText) {
   const models = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-latest", // Atau "gemini-pro"
+        model: "gemini-2.5-flash",
   });
 const prompt = `
     Analisis teks berikut dan tentukan jenisnya. Jawabanmu HARUS 'INVOICE', 'STNK', 'BPKB', 'KTP', atau 'TIDAK_DIKETAHUI'.
